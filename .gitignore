@@ -1,0 +1,5 @@
+node_modules/
+test/shots/
+test/last-run.log
+test/last-mobile-run.log
+test/exit*.txt
