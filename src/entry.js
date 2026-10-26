@@ -78,7 +78,7 @@ function endRun(res) { if (S.state !== 'play') return; S.result = res; S.endT = 
   S.state = 'end'; if (res === 'win') { A.sfx.win(); for (let i = 0; i < S.stars; i++) after(.45 + i * .35, () => A.sfx.star(i)); } else if (res !== 'quit') A.sfx.fail();
   music.start('menu', S.gt + 1.2, { force: true }); showEnd(); setUI(); }
 const accOf = q => q.taps ? q.caught / q.taps : 0;
-function toMenu() { S.state = 'menu'; S.more = false; S.player = 0; resetVisuals(); Q = menuHunt(); S.auto = false; S.titleT = -1; $('opening').style.opacity = 0;
+function toMenu() { S.state = 'menu'; $('toast').classList.remove('show'); S.more = false; S.player = 0; resetVisuals(); Q = menuHunt(); S.auto = false; S.titleT = -1; $('opening').style.opacity = 0;
   hideHint(); W.rainK = .15; music.start('menu', S.gt + .1, { force: true }); setUI(); applyLang(); }
 // behind the menu the yard is alive: a gentle demo hunt (the bot sweeps the lantern, ghosts peek and dash)
 function menuHunt() { const h = new Hunt({ mode: 'endless', night: 1, diff: 'kids', seed: 4242 }); h.decoys.length = 0; h.oil = 1e9; h.oilMax = 1e9; for (let i = 0; i < 12; i++) h.step(.1); h.ev = []; h.setBeam(0, .4); return h; }

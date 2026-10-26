@@ -21,6 +21,7 @@ body:not([data-state=play]) #btnQuit, body:not([data-state=play]) #btnSound { di
 body[data-state=play] #btnGear, body[data-state=intro] #btnGear, body[data-state=end] #btnGear, body[data-state=handover] #btnGear { display: none; }
 #toast { position: fixed; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 64px); transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: rgba(10, 10, 24, .75); border: 1px solid var(--line); font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; white-space: nowrap; }
 #toast.show { opacity: 1; }
+body:not([data-state=play]) #toast { opacity: 0 !important; } /* a play toast never lingers over the menu / end screen */
 /* ---------- banners, pops, night card ---------- */
 #pops { position: fixed; left: 50%; top: 44%; width: 0; height: 0; z-index: 5; pointer-events: none; }
 .pop { position: absolute; white-space: nowrap; font-weight: 700; font-size: 22px; text-shadow: 0 2px 0 rgba(20, 6, 10, .9), 0 0 16px rgba(0, 0, 0, .7); will-change: transform, opacity; }

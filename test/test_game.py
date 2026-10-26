@@ -129,6 +129,8 @@ async def main():
         await ev(pg, '__ps.fillStorm()'); await pg.keyboard.press('l'); s1 = await ev(pg, '__ps.hunt().state')
         await pg.keyboard.press('Escape'); m = await ev(pg, '__ps.S.state')
         check('keyboard: arrows move the lantern, Space catches in the light, L calls the lightning, Esc = menu', r2[0] > r[0] + .5 and c1 == c0 + 1 and s1 == 'strike' and m == 'menu', (r, r2, c0, c1, s1, m))
+        await ev(pg, '__ps.stepq(1/30, 3)'); await pg.wait_for_timeout(900); to = await ev(pg, '[document.getElementById("toast").classList.contains("show"), +getComputedStyle(document.getElementById("toast")).opacity]')
+        check('back in the menu no play toast lingers over the title', not to[0] and to[1] < .05, to)
         check('no console errors so far', not logs, logs[:4])
         # ================= 3) full nights with a human-like player =================
         out = []
