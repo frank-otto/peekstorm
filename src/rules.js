@@ -53,6 +53,10 @@ export class Hunt {
     this.emit('flee', { id: g.id, kind: g.kind, why }); }
   // ---- input ----
   setBeam(x, z) { this.beam.x = clamp(fin(x, this.beam.x), YARD.x0, YARD.x1); this.beam.z = clamp(fin(z, this.beam.z), YARD.z0, YARD.z1); }
+  // tap-to-shine: the ghost hiding closest to the tapped spot is startled and pops up for a clear moment (a catch window)
+  startle(x, z) { if (this.state !== 'hunt') return null; let best = null, bd = this.beam.r * 1.8;
+    for (const g of this.ghosts) { if (!g.alive || g.st !== 'hide') continue; const d = Math.hypot(g.x - x, (g.z - z) * .78); if (d < bd) { bd = d; best = g; } }
+    if (best) { best.st = 'peek'; best.stT = 0; best.startled = true; best.peekLen = this.kids ? 2.8 : Math.max(1.3, this.D.peekLen * 2); this.emit('startle', { id: best.id, kind: best.kind, x: best.x }); } return best; }
   catchable(g) { return g.alive && (this.state === 'strike' || g.st === 'peek' || g.st === 'flee' || g.rev > .35); }
   tap(id) { if (!(this.state === 'hunt' || this.state === 'strike')) return { ok: false }; this.taps++;
     const g = this.ghosts.find(q => q.id === id); if (!g || !this.catchable(g)) { this.misses++; this.combo = 0; // a clumsy grab makes noise: every peeking ghost ducks back behind its stone
@@ -96,7 +100,7 @@ export class Hunt {
       if (lit && g.rev >= 1) { if (g.nerveT === 0) this.emit('spotted', { id: g.id, kind: g.kind }); g.nerveT += dt; if (g.nerveT >= D.nerve * TYPES[g.kind].nerveK) this.flee(g); }
       else if (!lit) g.nerveT = Math.max(0, g.nerveT - dt * .5);
       if (g.st === 'hide') { g.peekT -= dt; if (g.peekT <= 0 && !lit) { g.st = 'peek'; g.stT = 0; this.emit('peek', { id: g.id, kind: g.kind, x: g.x }); } }
-      else if (g.st === 'peek' && g.stT >= D.peekLen) { g.st = 'hide'; g.stT = 0; g.peekT = D.peekEvery * (.6 + this.rnd() * .8); } }
+      else if (g.st === 'peek' && g.stT >= (g.peekLen || D.peekLen)) { g.st = 'hide'; g.peekLen = 0; g.startled = false; g.stT = 0; g.peekT = D.peekEvery * (.6 + this.rnd() * .8); } }
     for (const d of this.decoys) { d.next -= dt; d.hop = Math.max(0, d.hop - dt * 2); d.look += dt; if (d.next <= 0) { this.placeDecoy(d, false); this.emit('decoyMove', { kind: d.kind }); } }
     this.fill(); }
   stars() { if (this.res !== 'win') return 0; const q = this.D.quota; return this.score >= q * 520 ? 3 : this.score >= q * 340 ? 2 : 1; }

@@ -34,7 +34,7 @@ let isTouch = matchMedia && matchMedia('(pointer: coarse)').matches;
 // ---------------- renderer / scene / post ----------------
 const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!window.__psPDB });
-renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.42; renderer.shadowMap.type = THREE.PCFShadowMap;
 const W = createWorld(renderer); const scene = W.scene;
 const camera = new THREE.PerspectiveCamera(50, 1, .1, 400);
 const F = createFX(scene, W.soft, W.smokeTex); F.floor = .02;
@@ -56,7 +56,7 @@ function applyQuality(qn, user) {
 function qLabels() { const b = $('btnQ2'); if (b) { b.textContent = `⚙ ${t('q_' + S.q)}${S.qUser ? '' : ' · ' + t('qAuto')}`; b.title = t('qL'); } }
 let VW = 1, VH = 1;
 function resize() { VW = window.innerWidth; VH = window.innerHeight; const dpr = Math.min(window.devicePixelRatio || 1, QUALITY[S.q].dpr);
-  renderer.setPixelRatio(dpr); renderer.setSize(VW, VH, false); if (composer) { composer.setPixelRatio(dpr); composer.setSize(VW, VH); } camera.aspect = VW / VH; camera.updateProjectionMatrix(); }
+  renderer.setPixelRatio(dpr); renderer.setSize(VW, VH, false); if (composer) { composer.setPixelRatio(dpr); composer.setSize(VW, VH); } camera.aspect = VW / VH; camera.updateProjectionMatrix(); W.rainScale = (isTouch || Math.min(VW, VH) < 600) ? .5 : 1; }
 
 // ---------------- run state ----------------
 let Q = null; const timers = []; const after = (s, f) => timers.push({ t: S.gt + s, f });
@@ -69,7 +69,7 @@ function start(mode = 'night') { S.mode = ['night', 'endless', 'duel'].includes(
   if (S.mode === 'duel' && S.player !== 1) { S.player = 0; S.duel = [null, null]; S.duelSeed = window.__psQSeed ?? ((Date.now() & 0xffff) + 7); }
   resetVisuals(); Q = new Hunt({ mode: S.mode, night: S.mode === 'endless' ? 2 : S.night, diff: dkey(), seed: seedOf() }); S.state = 'play'; S.result = null; S.more = false; S.auto = !!window.__psAuto;
   Q.setBeam(0, .6); W.rainK = Q.N.rain; music.start('hunt', S.gt + .2, { force: true, bpm: [96, 100, 108][Q.night] + (S.mode === 'endless' ? 6 : 0), tr: [0, -2, 1][Q.night] }); A.sfx.lantern(); seedFX(1818);
-  S.hintT = S.gt; camSnap = true; handleEvents(); setUI(); applyLang(); }
+  S.aim = null; S.quietT = -1; S.held = []; S.tut = S.mode === 'night' && S.night === 0 && ls.get('ps-tut', '0') !== '1' && !window.__psNoTut ? 0 : -1; S.hintT = S.tut >= 0 ? S.gt : -1; camSnap = true; handleEvents(); setUI(); applyLang(); }
 function endRun(res) { if (S.state !== 'play') return; S.result = res; S.endT = S.gt;
   const snap = () => ({ score: Q.score, caught: Q.caught, best: Q.best, strikes: Q.strikes, frozen: Q.frozenCaught, acc: accOf(Q), res });
   if (S.mode === 'duel' && res !== 'quit') { S.duel[S.player] = snap(); if (S.player === 0) { S.state = 'handover'; S.player = 1; A.sfx.turn(); music.start('menu', S.gt + .5, { force: true }); setUI(); applyLang(); return; } }
@@ -79,7 +79,7 @@ function endRun(res) { if (S.state !== 'play') return; S.result = res; S.endT = 
   music.start('menu', S.gt + 1.2, { force: true }); showEnd(); setUI(); }
 const accOf = q => q.taps ? q.caught / q.taps : 0;
 function toMenu() { S.state = 'menu'; $('toast').classList.remove('show'); S.more = false; S.player = 0; resetVisuals(); Q = menuHunt(); S.auto = false; S.titleT = -1; $('opening').style.opacity = 0;
-  hideHint(); W.rainK = .15; music.start('menu', S.gt + .1, { force: true }); setUI(); applyLang(); }
+  $('hint').classList.remove('show'); W.rainK = .15; music.start('menu', S.gt + .1, { force: true }); setUI(); applyLang(); }
 // behind the menu the yard is alive: a gentle demo hunt (the bot sweeps the lantern, ghosts peek and dash)
 function menuHunt() { const h = new Hunt({ mode: 'endless', night: 1, diff: 'kids', seed: 4242 }); h.decoys.length = 0; h.oil = 1e9; h.oilMax = 1e9; for (let i = 0; i < 12; i++) h.step(.1); h.ev = []; h.setBeam(0, .4); return h; }
 function startIntro() { S.state = 'intro'; S.introT = 0; S.titleT = -1; resetVisuals(); seedFX(77); music.stop(); camSnap = true;
@@ -94,7 +94,7 @@ const EMBER = ['#ffffff', '#cfe6ff', '#9ad0ff', '#ffe2a8'];
 function strikeVisuals(quiet) { W.boltSeed = (W.boltSeed || 7) + 13; buildBolt(W, camera.position, W.boltSeed); W.boltK = 1; W.flash = 1; S.punch = 1; S.xrayT = 1; S.crowdT = 1; S.lanternT = .35;
   sparks(F, _v.copy(W.oakTop), 90, { colors: EMBER, speed: 4.5, up: 2.5, life: 1.4, size: .09, grav: 3 }); puff(F, _v.copy(W.oakTop), 2.2, '#9aa4c0');
   after(.09, () => { W.boltK = 1; W.flash = Math.max(W.flash, .7); }); after(.24, () => { W.boltK = .9; W.flash = Math.max(W.flash, .55); }); after(.55, () => { W.flash = Math.max(W.flash, .35); });
-  if (!quiet) { banner(t('strikeBanner')); after(1.0, () => toast(t('watching'))); } }
+  if (!quiet) { $('banner').classList.remove('show'); $('toast').classList.remove('show'); for (const el of [...$('pops').children]) el.remove(); S.quietT = S.rt + 1.5; toast(t('watching')); } } // first 1.5 s (real time): a clean reveal, every text waits (held) until then
 function strikeOff() { S.xrayT = 0; S.crowdT = 0; S.lanternT = 1; }
 
 // ---------------- events from the rules → visuals + sound ----------------
@@ -113,13 +113,14 @@ function handleEvents() {
       case 'catch': { const p = new THREE.Vector3(e.x, .9, e.z); A.sfx.catch(e, panOf(e.x), Q.kids); const col = e.kind === 'shade' ? '#c08aff' : e.kind === 'mimic' ? '#8aff6a' : '#bfe8ff';
         sparks(F, p, e.frozen ? 60 : 38, { colors: [col, '#ffffff', '#ffe2a8'], speed: 2.6, up: 1.6, life: .9, size: .07, grav: .7 }); S.punch = Math.max(S.punch, .35);
         const tag = e.frozen ? t('frozen') : e.midair ? t('midair') : e.peek ? t('peekBonus') : t('caught'); popAt(`${tag} +${fmt(e.pts)}`, col, 'j', p.clone().setY(1.5));
-        if ([3, 6, 9, 12, 15, 20].includes(e.combo)) banner(`🔥 ${e.combo} ${t('combo')} · ×${e.mult}`); hideHint(); break; }
+        if ([3, 6, 9, 12, 15, 20].includes(e.combo)) banner(`🔥 ${e.combo} ${t('combo')} · ×${e.mult}`); tutStep(1, Q.canStrike() ? 3 : 2); break; }
       case 'tapMiss': A.sfx.tapMiss(); break;
+      case 'startle': A.sfx.peek(panOf(e.x), Q.kids); break;
       case 'decoy': { const d = Q.decoys[e.i]; const p = d ? decoyPos(d, new THREE.Vector3()) : null; A.sfx.decoy(e.kind, p ? panOf(p.x) : 0, Q.kids); if (!Q.kids) W.hurt = Math.max(W.hurt, .35);
         popAt(`${t(e.kind === 'cat' ? 'decoyCat' : 'decoyOwl')}${e.cost ? ` −${e.cost} ${t('decoyCost')}` : ''}`, '#ffd27a', 'small', p ? p.setY(p.y + .6) : null); break; }
       case 'decoyMove': A.sfx.decoyMove(e.kind); break;
-      case 'stormReady': A.sfx.stormReady(); banner(t('stormReady')); W.flash = Math.max(W.flash, .25); after(1.4, () => { if (Q && Q.canStrike()) toast(t('strikeTip')); }); break;
-      case 'strike': A.sfx.strike(); strikeVisuals(false); break;
+      case 'stormReady': tutStep(2, 3); A.sfx.stormReady(); banner(t('stormReady')); W.flash = Math.max(W.flash, .25); after(1.4, () => { if (Q && Q.canStrike()) toast(t('strikeTip')); }); break;
+      case 'strike': tutStep(S.tut, 9); A.sfx.strike(); strikeVisuals(false); break;
       case 'strikeEnd': A.sfx.strikeEnd(); strikeOff(); toast(t('strikeEnd')); break;
       case 'wave': A.sfx.wave(); toast('👻 ' + t('wave')); break;
       case 'lowOil': A.sfx.lowOil(); toast('🔥 ' + t('lowOil')); break;
@@ -135,7 +136,7 @@ function handleEvents() {
 let camSnap = true; const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 // the yard seen from the front gate, a little above: landscape sees the whole churchyard, portrait follows the lantern sideways
 function playCam(tp, tl) { const a = VW / VH; const bx = Q ? Q.beam.x : 0; const k = smooth((a - .8) / .7); // portrait: steep, close, follows the lantern · landscape: the whole churchyard
-  const H = lerp(9, 7, k), D = lerp(7.4, 10, k), Lz = lerp(.2, -.8, k) - (1 - k) * clamp((640 - VH) / 90, 0, 1) * .55, vf = lerp(62, 44, k); // portrait: yard between ~26 % and ~77 % of the height (HUD above, thumb zone below)
+  const H = lerp(7.9, 6.2, k), D = lerp(6.6, 8.9, k), Lz = lerp(.2, -.8, k) - (1 - k) * clamp((640 - VH) / 90, 0, 1) * .55, vf = lerp(62, 44, k); // portrait: yard between ~26 % and ~77 % of the height (HUD above, thumb zone below)
   const dist = Math.hypot(H, D - Lz), hw = Math.tan(THREE.MathUtils.degToRad(vf / 2)) * a * dist; const span = Math.max(0, 6.9 - hw * .85); const tx = clamp(bx * .6, -span, span);
   S.camX = camSnap ? tx : lerp(S.camX, tx, .06); const x = lerp(S.camX, 0, S.wideK * .5);
   tp.set(x, H + S.wideK * 1.4, D + S.wideK * 1.8); tl.set(x * .96, S.wideK * .8, Lz); return vf * (1 + S.wideK * .1); }
@@ -160,17 +161,19 @@ function updateCamera(dt) {
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 function groundAt(cx, cy, out) { ndc.set(cx / VW * 2 - 1, -(cy / VH) * 2 + 1); ray.setFromCamera(ndc, camera); const r = ray.ray;
   if (r.direction.y > -.02) { r.at(30, out); out.y = 0; return out; } return r.intersectPlane(ground, out) || out.set(0, 0, 0); }
-function aimAt(cx, cy) { if (!Q || S.state !== 'play') return; const p = groundAt(cx, cy, _v); Q.setBeam(p.x, p.z + .25); } // aim a little behind: a finger points at the bottom of a ghost
+function aimAt(cx, cy) { if (!Q || S.state !== 'play') return; const p = groundAt(cx, cy, _v); S.aim = null; Q.setBeam(p.x, p.z + .25); }
+// tap-to-shine: the lantern swings to the tapped spot (smooth, ~0.2 s) and the ghost hiding nearest to it is startled out
+function shineAt(cx, cy) { if (!Q || S.state !== 'play' || !(Q.state === 'hunt' || Q.state === 'count')) return null; const p = groundAt(cx, cy, _v); S.aim = { x: p.x, z: p.z + .25 }; const g = Q.startle(p.x, p.z + .25); tutStep(0, 1); handleEvents(); return g ? g.id : 0; } // aim a little behind: a finger points at the bottom of a ghost
 function toScreen(p) { _sp.copy(p).project(camera); return { x: (_sp.x * .5 + .5) * VW, y: (-_sp.y * .5 + .5) * VH, z: _sp.z }; }
 function pxPerM(p) { const a = toScreen(p), b = toScreen(_w.copy(p).add(_sp.set(0, 1, 0))); return Math.abs(a.y - b.y); }
 function ghostTargets() { const out = []; if (!Q) return out; for (const v of K.pool) { if (v.id < 0 || v.caughtT >= 0 || !v.root.visible && v.kind !== 'shade') continue; const g = Q.ghosts.find(q => q.id === v.id); if (!g || !g.alive) continue;
-    const c = ghostScreenPos(v, new THREE.Vector3()); const s = toScreen(c); if (s.z > 1) continue; out.push({ g, s, r: Math.max(30, pxPerM(c) * (v.kind === 'mimic' ? .42 : .55)) }); } return out; }
+    const c = ghostScreenPos(v, new THREE.Vector3()); const s = toScreen(c); if (s.z > 1) continue; out.push({ g, s, r: Math.max(30, pxPerM(c) * (v.kind === 'mimic' ? .5 : .7)) }); } return out; }
 function tapAt(cx, cy) { if (!Q || S.state !== 'play' || !(Q.state === 'hunt' || Q.state === 'strike')) return null; A.unlock();
-  let best = null, bd = 1e9; for (const o of ghostTargets()) { if (!Q.catchable(o.g)) continue; const d = Math.hypot(o.s.x - cx, o.s.y - cy); if (d < Math.max(o.r, 34) && d < bd) { bd = d; best = o; } }
+  let best = null, bd = 1e9; for (const o of ghostTargets()) { if (!Q.catchable(o.g)) continue; const d = Math.hypot(o.s.x - cx, o.s.y - cy); if (d < Math.max(o.r, isTouch ? 50 : 36) && d < bd) { bd = d; best = o; } }
   if (best) { const r = Q.tap(best.g.id); handleEvents(); return r.ok ? 'catch' : 'miss'; }
   for (let i = 0; i < Q.decoys.length; i++) { const d = Q.decoys[i]; if (d.spot < 0) continue; const p = decoyPos(d, new THREE.Vector3()); const s = toScreen(p); const r = Math.max(28, pxPerM(p) * .35);
     if (Math.hypot(s.x - cx, s.y - cy) < r && (Q.state === 'strike' || Math.hypot(d.x - Q.beam.x, (d.z - Q.beam.z) * .78) < Q.beam.r * 1.2)) { Q.tapDecoy(i); handleEvents(); return 'decoy'; } }
-  Q.tap(-1); handleEvents(); return 'miss'; }
+  return 'shine'; } // empty ground is not a miss: it points the lantern there (shineAt)
 function tapAtBeam() { if (!Q) return; let best = null, bd = 1e9; for (const g of Q.ghosts) { if (!Q.catchable(g)) continue; const d = Math.hypot(g.x - Q.beam.x, g.z - Q.beam.z); if (d < bd && (d < Q.beam.r * 1.4 || Q.state === 'strike')) { bd = d; best = g; } }
   if (best) { Q.tap(best.id); } else Q.tap(-1); handleEvents(); }
 function doStrike() { if (!Q || S.state !== 'play') return false; A.unlock(); const ok = Q.strike(); handleEvents(); setUI(); return ok; }
@@ -178,8 +181,8 @@ let dragId = null, downAt = null;
 canvas.addEventListener('pointerdown', e => { if (S.state !== 'play' || !Q) return; e.preventDefault(); if (e.pointerType === 'touch' && !isTouch) { isTouch = true; applyLang(); }
   dragId = e.pointerId; try { canvas.setPointerCapture(e.pointerId); } catch (x) {} downAt = { x: e.clientX, y: e.clientY };
   // a tap both points the lantern there and tries to catch what is under the finger
-  const r = tapAt(e.clientX, e.clientY); if (r !== 'catch') aimAt(e.clientX, e.clientY); });
-canvas.addEventListener('pointermove', e => { if (S.state !== 'play' || !Q) return; if (e.pointerType === 'mouse' || dragId === e.pointerId) aimAt(e.clientX, e.clientY); });
+  const r = tapAt(e.clientX, e.clientY); if (r === 'shine') shineAt(e.clientX, e.clientY); });
+canvas.addEventListener('pointermove', e => { if (S.state !== 'play' || !Q) return; if (e.pointerType === 'mouse' ? !e.buttons || dragId === e.pointerId : dragId === e.pointerId && downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 24) aimAt(e.clientX, e.clientY); }); // drag still works, never needed
 const up = e => { if (dragId === e.pointerId) dragId = null; }; canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 $('btnBolt').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); doStrike(); }); $('btnBolt').addEventListener('click', e => { e.stopPropagation(); if (e.detail === 0) doStrike(); });
@@ -228,12 +231,15 @@ function showEnd() { const duel = S.mode === 'duel', r = S.result; let title;
   $('eStats').innerHTML = duel && S.duel[0] && S.duel[1] ? [0, 1].map(i => `<div><b>${t(i ? 'p2' : 'p1')}</b> 👻 ${S.duel[i].caught} · 🔥 ${S.duel[i].best} · ⚡ ${S.duel[i].strikes} · 🎯 ${pct(S.duel[i].acc)}</div>`).join('')
     : Q && Q.ghosts ? `<div>👻 ${t('stCaught')}: <b>${Q.caught}</b> · 🔥 ${t('stBest')}: <b>${Q.best}</b></div><div>⚡ ${t('stStrikes')}: <b>${Q.strikes}</b> · ❄ ${t('stFrozen')}: <b>${Q.frozenCaught}</b> · 💨 ${t('stMid')}: <b>${Q.midair}</b></div><div>🎯 ${t('acc')}: <b>${pct(accOf(Q))}</b>${Q.decoyHits ? ` · 🐈‍⬛ ${t('stDecoy')}: <b>${Q.decoyHits}</b>` : ''}</div>` : '';
   $('btnAgain').textContent = duel ? t('againD') : t('again'); $('eName').value = S.name; }
-function showHintText() { $('hintT').textContent = t(isTouch ? 'hintTouch' : 'hintKeys'); $('hintG').textContent = t('hintGoal'); }
-function hideHint() { if (S.hintT < 0) return; S.hintT = -1; $('hint').classList.remove('show'); }
-function popAt(txt, col, cls, at) { (window.__pops = window.__pops || []).push(txt); let x = 0, y = -VH * .08; if (at) { _sp.copy(at).project(camera); if (_sp.z < 1) { x = clamp(_sp.x * .5 * VW, -VW * .36, VW * .36); y = clamp(-_sp.y * .5 * VH, -VH * .36, VH * .3); } }
+// first-play hint (Night I only, once): 1 tap to shine → 2 tap the ghost → (storm full) 3 tap the lightning. Never blocks, ✕ skips.
+function showHintText() { const k = S.tut; $('hintT').textContent = k >= 0 && k <= 3 ? `${Math.min(k, 2) + 1}/3  ${t(k === 0 ? (isTouch ? 'tut1' : 'tut1m') : k >= 2 ? 'tut3' : 'tut2')}` : ''; $('hintG').textContent = ''; $('hint').dataset.step = k; }
+function tutStep(from, to) { if (S.tut < 0 || S.tut !== from) return; S.tut = to; if (to >= 9) { ls.set('ps-tut', '1'); hideHint(); return; } showHintText(); }
+function hideHint() { S.hintT = -1; if (S.tut >= 0 && S.tut < 9) { S.tut = -1; ls.set('ps-tut', '1'); } $('hint').classList.remove('show'); }
+const quiet = () => S.state === 'play' && S.quietT > 0 && S.rt < S.quietT;
+function popAt(txt, col, cls, at) { if (quiet()) { S.held.push(() => popAt(txt, col, cls, at && at.clone())); return; } (window.__pops = window.__pops || []).push(txt); let x = 0, y = -VH * .08; if (at) { _sp.copy(at).project(camera); if (_sp.z < 1) { x = clamp(_sp.x * .5 * VW, -VW * .36, VW * .36); y = clamp(-_sp.y * .5 * VH, -VH * .36, VH * .3); } }
   const el = document.createElement('div'); el.className = 'pop ' + (cls || ''); el.textContent = txt; el.style.color = col; el.style.left = x + 'px'; el.style.top = y + 'px'; el.dataset.t0 = S.gt; $('pops').appendChild(el); const hw = el.offsetWidth / 2 + 8; if (hw * 2 < VW) el.style.left = clamp(x, -VW / 2 + hw, VW / 2 - hw) + 'px'; if ($('pops').children.length > 8) $('pops').firstChild.remove(); }
-function banner(s) { if (!s) return; (window.__banners = window.__banners || []).push(s); const el = $('banner'); el.textContent = s; el.dataset.t0 = S.gt; el.classList.add('show'); el.style.transform = 'translate(-50%,-50%)'; el.dataset.fit = Math.min(1, innerWidth * .92 / Math.max(1, el.scrollWidth)).toFixed(3); }
-function toast(s) { if (S.state !== 'play') return; const el = $('toast'); el.textContent = s; el.classList.add('show'); el.dataset.t0 = S.gt; }
+function banner(s) { if (!s) return; if (quiet()) { S.held.push(() => banner(s)); return; } (window.__banners = window.__banners || []).push(s); const el = $('banner'); el.textContent = s; el.dataset.t0 = S.gt; el.classList.add('show'); el.style.transform = 'translate(-50%,-50%)'; el.dataset.fit = Math.min(1, innerWidth * .92 / Math.max(1, el.scrollWidth)).toFixed(3); }
+function toast(s) { if (S.state !== 'play') return; if (quiet()) { S.held.push(() => toast(s)); return; } const el = $('toast'); el.textContent = s; el.classList.add('show'); el.dataset.t0 = S.gt; }
 // off-screen peek markers: a ghost giggling outside the view shows a little glowing arrow at the screen edge
 const edgeEls = [...document.querySelectorAll('.edge')];
 function updateEdges() { let n = 0; if (S.state === 'play' && Q && Q.state === 'hunt') for (const g of Q.ghosts) { if (!g.alive || g.st !== 'peek' || n >= edgeEls.length) continue; const s = toScreen(_v.set(g.x, .8, g.z)); if (s.x > 18 && s.x < VW - 18) continue;
@@ -242,7 +248,7 @@ function updateEdges() { let n = 0; if (S.state === 'play' && Q && Q.state === '
 function updateOverlays() {
   const bn = $('banner'); if (bn.classList.contains('show')) { const a = S.gt - (+bn.dataset.t0), fit = +bn.dataset.fit || 1; const k = a < .18 ? a / .18 : a > 1.5 ? Math.max(0, 1 - (a - 1.5) / .3) : 1; bn.style.opacity = k; bn.style.transform = `translate(-50%,-50%) scale(${((a < .18 ? 1 + .4 * (1 - a / .18) : 1 + a * .02) * fit).toFixed(3)})`; if (a > 1.85) bn.classList.remove('show'); }
   const ts = $('toast'); if (ts.classList.contains('show') && S.gt - (+ts.dataset.t0) > 2.4) ts.classList.remove('show');
-  if (S.state === 'play' && S.hintT >= 0) { const a = S.gt - S.hintT; $('hint').classList.toggle('show', a > .2 && a < 6.5 && !document.body.classList.contains('cine')); if (a >= 6.5) hideHint(); }
+  if (S.state === 'play' && S.tut >= 0 && S.tut < 9) $('hint').classList.toggle('show', S.gt - S.hintT > .2 && S.tut !== 2 && !document.body.classList.contains('cine') && Q && Q.state !== 'clear'); else $('hint').classList.remove('show');
   for (const el of [...$('pops').children]) { const a = S.gt - (+el.dataset.t0); if (a > 1.0) { el.remove(); continue; } el.style.opacity = a < .08 ? a / .08 : 1 - Math.max(0, (a - .6) / .4); el.style.transform = `translate(-50%,-50%) translateY(${-a * 44}px) scale(${a < .1 ? .6 + a / .1 * .5 : 1.1 - Math.min(.1, a * .2)})`; }
   const op = $('opening'); if (S.state === 'intro' && S.titleT >= 0) { const a = S.introT - S.titleT; const sIn = a < .28 ? 3.2 - 2.2 * smooth(a / .28) : 1; const rec = smooth((a - 1.6) / 2.2);
     op.style.opacity = a < .08 ? a / .08 : 1 - smooth((a - 2.6) / 1.0); $('oTitle').style.transform = `translateY(${-rec * VH * .14}px) scale(${(sIn * (1 - rec * .5)).toFixed(3)})`; } else if (S.state !== 'intro') op.style.opacity = 0;
@@ -264,6 +270,7 @@ $('btnQuit').onclick = () => { if (S.state === 'play') endRun('quit'); toMenu();
 $('btnAgain').onclick = () => { A.unlock(); if (S.mode === 'duel') { S.player = 0; start('duel'); } else start(S.mode); }; $('btnMenu').onclick = () => toMenu();
 $('btnCard').onclick = () => saveCard(false); $('btnShare').onclick = () => saveCard(true);
 $('btnGo').onclick = () => { A.unlock(); start('duel'); }; $('handover').addEventListener('click', e => { if (e.target.id !== 'btnGo') $('btnGo').click(); });
+$('hintX').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); hideHint(); });
 $('eName').addEventListener('keydown', e => e.stopPropagation()); $('eName').addEventListener('input', () => { S.name = ($('eName').value || '').slice(0, 18); });
 if (ls.get('ps-mute', '0') === '1') A.setMuted(true);
 // ---- ONE TAP TO PLAY: the first tap/click anywhere on the opening goes straight into Night I (sound unlocks on that same tap) ----
@@ -312,7 +319,8 @@ function step(dt) {
   dt = Math.max(0, Math.min(fin(dt), 1 / 20)); // never step backwards, never jump
   let want = 1; const cineQ = Q && Q.state === 'strike' && (S.state === 'play' || S.state === 'intro');
   if (cineQ) { const u = Q.cineT; want = u < .12 ? 1 : u < 1.1 ? .32 : u < 1.7 ? lerp(.32, 1, smooth((u - 1.1) / .6)) : 1; }
-  S.ts = clamp(fin(want, 1), .05, 1.5); const gdt = dt * S.ts; S.gt += gdt;
+  S.ts = clamp(fin(want, 1), .05, 1.5); const gdt = dt * S.ts; S.gt += gdt; S.rt = (S.rt || 0) + dt;
+  if (S.held && S.held.length && !quiet()) { const h = S.held.splice(0); S.quietT = -1; if (S.state === 'play') h.forEach(f => f()); }
   for (let i = timers.length - 1; i >= 0; i--) if (timers[i] && timers[i].t <= S.gt) { const f = timers[i].f; timers.splice(i, 1); f(); }
   for (const k of ['flash', 'hurt', 'boltK', 'xray', 'crowdK', 'lanternK', 'rainK', 'storm']) if (!Number.isFinite(W[k])) W[k] = 0; for (const k of ['punch', 'camX', 'wideK']) if (!Number.isFinite(S[k])) S[k] = 0; // NaN guards
   if (S.state === 'play' && Q) { music.I = clamp(Q.combo / 9 + (Q.canStrike() ? .4 : 0) + (Q.oil < 15 && !Q.kids ? .3 : 0), 0, 1); music.vol = Q.state === 'strike' ? .25 : 1; } else { music.I = .2; music.vol = 1; } music.step(S.gt);
@@ -324,7 +332,7 @@ function step(dt) {
     if (it > 2.9 && S.intro.stage === 1) { S.intro.stage = 2; S.lanternT = 1; A.sfx.lantern(); const g = Q.ghosts.find(q => q.alive && q.kind !== 'mimic' && q.st === 'hide') || Q.ghosts.find(q => q.alive); if (g) { g.st = 'peek'; g.stT = -1.6; g.peekT = 9; Q.setBeam(g.x, g.z); A.sfx.peek(0, false); } }
     if (it >= 3.6 && S.intro.stage < 3) { S.intro.stage = 3; S.titleT = it; A.sfx.title(); W.flash = .35; S.punch = .7; }
     if (Q) { Q.step(gdt); Q.ev = []; } if (S.titleT >= 0 && it - S.titleT > 3.8) toMenu(); }
-  else if (S.state === 'play' && Q) { const was = Q.state; keyAim(gdt); Q.step(gdt); handleEvents();
+  else if (S.state === 'play' && Q) { const was = Q.state; keyAim(gdt); if (S.aim) { const k = 1 - Math.exp(-dt * 16); Q.setBeam(lerp(Q.beam.x, S.aim.x, k), lerp(Q.beam.z, S.aim.z, k)); if (Math.hypot(Q.beam.x - S.aim.x, Q.beam.z - S.aim.z) < .02) S.aim = null; } Q.step(gdt); handleEvents();
     if (S.auto) { botStep(Q, S.botAcc, rng, gdt, S.botOpt); handleEvents(); }
     if (Q && Q.state !== was) setUI(); }
   else if (Q) { botStep(Q, .9, rng, gdt, { strike: false, react: .5, speed: 2.2 }); Q.oil = 1e9; Q.step(gdt); handleEvents(); }
@@ -350,7 +358,7 @@ applyLang(); audioBadge();
 step(0); requestAnimationFrame(frameLoop);
 window.__ps = { S, W, K, F, step: (dt, n = 1) => { for (let i = 0; i < n; i++) step(dt); render(); }, stepq: (dt, n = 1) => { for (let i = 0; i < n; i++) step(dt); }, render, log: A.log, quality: q => q ? applyQuality(q, true) : S.q, renderer,
   start, end: endRun, toMenu, startIntro, endIntro, playNow, hunt: () => Q, auto: (v, acc, opt) => { S.auto = !!v; if (acc != null) S.botAcc = acc; if (opt) S.botOpt = opt; },
-  fillStorm: () => { if (Q) Q.storm = 1; }, strike: doStrike, tapAt, aimAt, tapAtBeam, setUI, applyLang, handleEvents, ghostTargets: () => ghostTargets().map(o => ({ id: o.g.id, x: o.s.x, y: o.s.y, r: o.r, ok: Q.catchable(o.g), st: o.g.st, kind: o.g.kind })),
+  fillStorm: () => { if (Q) Q.storm = 1; }, strike: doStrike, tapAt, aimAt, shineAt, tapAtBeam, tut: () => S.tut, skipTut: () => hideHint(), quiet: () => quiet(), setUI, applyLang, handleEvents, ghostTargets: () => ghostTargets().map(o => ({ id: o.g.id, x: o.s.x, y: o.s.y, r: o.r, ok: Q.catchable(o.g), st: o.g.st, kind: o.g.kind })),
   decoyScreen: i => { const d = Q && Q.decoys[i]; if (!d || d.spot < 0) return null; return toScreen(decoyPos(d, new THREE.Vector3())); }, spots: () => [...SPOTS, ...PSPOTS].map(s => toScreen(new THREE.Vector3(s.x, .6, s.z))), beamScreen: () => Q ? toScreen(_v.set(Q.beam.x, 0, Q.beam.z)) : null,
   card: saveCard, cardURL: async () => (await makeCard()).toDataURL('image/jpeg', .9), fps, fpsTick, advance, last: () => last, play: A.play, sfx: A.sfx, audioState: A.state,
   mem: () => ({ ...renderer.info.memory, programs: renderer.info.programs ? renderer.info.programs.length : 0 }),

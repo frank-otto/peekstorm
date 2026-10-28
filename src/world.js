@@ -69,15 +69,15 @@ export function createWorld(renderer) {
         gl_FragColor = vec4(col, 1.); }` }));
   W.sky.renderOrder = -10; W.sky.frustumCulled = false; scene.add(W.sky);
   // ---- lights: cold moonlight with shadows, a dim sky fill, the lantern posts, a jack-o'-lantern glow, the flash
-  W.hemi = new THREE.HemisphereLight('#3a4a7a', '#0a0c10', .22); scene.add(W.hemi);
-  W.key = new THREE.DirectionalLight('#9fb4ff', .55); W.key.position.set(6, 14, -9); W.key.target.position.set(0, 0, -.5); W.key.castShadow = true;
+  W.hemi = new THREE.HemisphereLight('#3a4a7a', '#0a0c10', .34); scene.add(W.hemi);
+  W.key = new THREE.DirectionalLight('#9fb4ff', .8); W.key.position.set(6, 14, -9); W.key.target.position.set(0, 0, -.5); W.key.castShadow = true;
   { const sc = W.key.shadow.camera; sc.left = -10; sc.right = 10; sc.top = 9; sc.bottom = -9; sc.near = 2; sc.far = 40; W.key.shadow.bias = -.0006; W.key.shadow.normalBias = .03; } scene.add(W.key, W.key.target);
   W.flashL = new THREE.DirectionalLight('#cfe0ff', 0); W.flashL.position.set(OAK.x - 2, 20, OAK.z + 6); W.flashL.target.position.set(0, 0, 0); scene.add(W.flashL, W.flashL.target);
   W.boltL = new THREE.PointLight('#bcd4ff', 0, 18, 1.6); W.boltL.position.set(OAK.x, 4.5, OAK.z); scene.add(W.boltL);
   // the lantern (the player's light): a warm spotlight with soft edges and shadows
   W.spot = new THREE.SpotLight('#ffcf8f', 60, 24, .3, .55, 1.4); W.spot.position.set(0, 5.5, 6); W.spot.castShadow = true; W.spot.shadow.bias = -.0004; W.spot.shadow.normalBias = .02; W.spot.shadow.camera.near = .5; W.spot.shadow.camera.far = 22;
   W.spotTarget = new THREE.Object3D(); scene.add(W.spot, W.spotTarget); W.spot.target = W.spotTarget;
-  W.pumpkinL = new THREE.PointLight('#ff9a3a', 1.6, 4.5, 1.8); W.pumpkinL.position.set(-2.6, .55, 2.95); scene.add(W.pumpkinL);
+  W.pumpkinL = new THREE.PointLight('#ff9a3a', 1.0, 4.5, 1.8); W.pumpkinL.position.set(-2.6, .55, 2.95); scene.add(W.pumpkinL);
   W.cryptL = new THREE.PointLight('#62ffb0', 0, 4, 2); W.cryptL.position.set(CRYPT.x - .2, 1.0, CRYPT.z + CRYPT.d / 2 - .3); scene.add(W.cryptL);
   // ---- materials
   T.ground.map.repeat.set(10, 10); T.ground.bump.repeat.set(10, 10); T.path.repeat.set(1, 8); T.brick.map.repeat.set(2, 1.5); T.brick.bump.repeat.set(2, 1.5); T.bark.repeat.set(2, 3); T.plank.repeat.set(2, 1); T.straw.repeat.set(3, 1);
@@ -88,7 +88,7 @@ export function createWorld(renderer) {
     brick: new THREE.MeshStandardMaterial({ map: T.brick.map, bumpMap: T.brick.bump, bumpScale: 1.2, roughness: .92, color: '#b8b8c0' }),
     darkStone: new THREE.MeshStandardMaterial({ map: T.stone.map, roughness: .9, color: '#7a7a82' }),
     iron: new THREE.MeshStandardMaterial({ color: '#1a1b20', metalness: .85, roughness: .45 }), bark: new THREE.MeshStandardMaterial({ map: T.bark, roughness: .95, color: '#9a9088' }),
-    plank: new THREE.MeshStandardMaterial({ map: T.plank, roughness: .85 }), straw: new THREE.MeshStandardMaterial({ map: T.straw, roughness: .95 }), black: new THREE.MeshBasicMaterial({ color: '#000000' }),
+    plank: new THREE.MeshStandardMaterial({ map: T.plank, roughness: .85 }), straw: new THREE.MeshStandardMaterial({ map: T.straw, color: '#9a9488', roughness: .95 }), black: new THREE.MeshBasicMaterial({ color: '#000000' }),
     glass: new THREE.MeshStandardMaterial({ color: '#ffd9a0', emissive: '#ffb050', emissiveIntensity: 2.2, roughness: .3 }), ...makePumpkinMats(T) };
   const add = (geo, mat, x, y, z, cast = true, recv = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = recv; scene.add(m); return m; };
   // ---- ground + path
@@ -126,7 +126,7 @@ export function createWorld(renderer) {
   // ---- pumpkin patch (two of them are lit jack-o'-lanterns), vines
   { const pg = pumpkinGeo(), sg = stemGeo(); W.pumpkinGeo = pg; W.stemGeo = sg;
     PUMPKINS.forEach(([x, z, s], i) => { const g0 = new THREE.Group(); g0.position.set(x, s * .5, z); g0.rotation.y = hash(i + 4) * 6; g0.scale.set(s * (1 + hash(i) * .12), s, s * (1 + hash(i + 9) * .1)); scene.add(g0);
-      const lit = i === 1 || i === 4; const mat = lit ? M.skin.clone() : M.skin; if (lit) { mat.emissiveMap = i === 1 ? T.face0 : T.face1; mat.emissive = new THREE.Color('#ff8a20'); mat.emissiveIntensity = 2.4; mat.map = T.pumpkin; }
+      const lit = i === 1 || i === 4; const mat = lit ? M.skin.clone() : M.skin; if (lit) { mat.emissiveMap = i === 1 ? T.face0 : T.face1; mat.emissive = new THREE.Color('#ff8a20'); mat.emissiveIntensity = 1.4; mat.map = T.pumpkin; }
       const m = new THREE.Mesh(pg, mat); m.castShadow = true; m.receiveShadow = true; g0.add(m); const st = new THREE.Mesh(sg, M.stem); st.castShadow = true; g0.add(st); if (lit) { g0.rotation.y = 0; W.litPumpkins = (W.litPumpkins || []).concat(mat); } W.pumpkins.push(g0); });
     const vm = new THREE.MeshStandardMaterial({ color: '#25331a', roughness: .9 }); for (let i = 0; i < 6; i++) { const pts = []; let x = -4.4 + i * .65, z = 2.1 + hash(i) * .4; for (let j = 0; j < 6; j++) { pts.push(new THREE.Vector3(x, .03, z)); x += (hash(i * 9 + j) - .5) * .6; z += .3; } add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, .025, 5, false), vm, 0, 0, 0, false, true); } }
   // ---- hay bale, barrels, well
@@ -218,9 +218,9 @@ export function updateWorld(W, t, dt, q, cam, beam) {
     W.motesU.time.value = t; W.motesU.apex.value.copy(ap); W.motesU.tgt.value.set(beam.x, 0, beam.z); W.motesU.rad.value = rr; W.motesU.k.value = W.lanternK; }
   W.motes.geometry.setDrawRange(0, q.motes);
   // jack-o'-lanterns + posts flicker, crypt glow
-  const fl = .85 + Math.sin(t * 11.3) * .08 + Math.sin(t * 23.7) * .05 + Math.sin(t * 5.1) * .04; W.pumpkinL.intensity = 1.6 * fl; (W.litPumpkins || []).forEach(m => m.emissiveIntensity = 2.4 * fl);
+  const fl = .85 + Math.sin(t * 11.3) * .08 + Math.sin(t * 23.7) * .05 + Math.sin(t * 5.1) * .04; W.pumpkinL.intensity = 1.0 * fl; (W.litPumpkins || []).forEach(m => m.emissiveIntensity = 1.4 * fl);
   W.posts.forEach((L, i) => { L.intensity = 2.6 * (.9 + Math.sin(t * (9 + i * 3)) * .05 + Math.sin(t * 17 + i) * .04); });
-  W.rainU.time.value = t; W.rainU.k.value = W.rainK; W.rainU.flash.value = W.flash; W.rain.visible = W.rainK > .01; W.rain.geometry.setDrawRange(0, q.rain * 2);
+  W.rainU.time.value = t; W.rainU.k.value = W.rainK; W.rainU.flash.value = W.flash; W.rain.visible = W.rainK > .01; W.rain.geometry.setDrawRange(0, Math.round(q.rain * (W.rainScale || 1)) * 2);
   for (let i = 0; i < W.mist.length; i++) { const m = W.mist[i], u = m.userData; m.visible = i < q.mist; let x = u.x + t * u.sp; x = ((x + 12) % 24 + 24) % 24 - 12; m.position.set(x, u.y, u.z); m.material.opacity = .1 + W.flash * .12; }
   W.scene.fog.density = .034 + W.rainK * .004 - W.flash * .012; W.churchWin.color.setRGB(.85 * fl, .5 * fl, .22 * fl);
   if (W.grassU) W.grassU.time.value = t;

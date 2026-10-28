@@ -86,6 +86,9 @@ async def main():
         await ev(pg, '__ps.stepq(1/30, 15)')
         st = await ev(pg, '[__ps.S.state, __ps.S.mode, __ps.hunt() && __ps.hunt().state, __ps.audioState(), document.getElementById("hint").classList.contains("show"), __ps.S.night]')
         check('ONE click anywhere on the opening → straight into Night I (count-in, short hint, audio unlocked)', st[:2] == ['play', 'night'] and st[2] in ('count', 'hunt') and st[3] in ('running', 'suspended') and st[4] and st[5] == 0, st)
+        await ev(pg, '__ps.stepq(1/30, 12); __ps.step(1/30)')
+        h = await ev(pg, '[document.getElementById("hintT").textContent, document.getElementById("hint").classList.contains("show"), __ps.tut(), getComputedStyle(document.getElementById("hint")).pointerEvents]')
+        check('first night: 3-step hint starts at "1/3 … shine", is not blocking (pointer-events none)', h[0].startswith('1/3') and h[1] and h[2] == 0 and h[3] == 'none', h)
         await shot(pg, 'p0-play.png', 20)
         hit = await ev(pg, HITTEST + "(['btnQuit','btnSound','btnLang'])")
         check('play screen: ✕ / sound / DE-EN hit-testable, ≥ 44 px', all(h[3] and h[1] >= 44 and h[2] >= 44 for h in hit), hit)
@@ -98,8 +101,20 @@ async def main():
         r = await ev(pg, f'(() => {{ const Q = __ps.hunt(); return [Q.caught, Q.score, Q.combo, __ps.log.slice({k0[2]}).map(e => e.n || e[1] || e).join(" ").slice(0, 200)]; }})()')
         check('clicking a peeking / lit ghost catches it: +points, combo, sparkle + chime sounds', t is not None and r[0] == k0[0] + 1 and r[1] > k0[1] and r[2] >= 1, (t, k0[:2], r))
         await shot(pg, 'p1-catch.png', 4)
-        r = await ev(pg, '(() => { const Q = __ps.hunt(); const m0 = Q.misses; __ps.tapAt(innerWidth * .5, innerHeight * .97); return [m0, Q.misses]; })()')
-        check('clicking empty ground is a miss (counted, no points)', r[1] == r[0] + 1, r)
+        r = await ev(pg, '(() => { const Q = __ps.hunt(); const m0 = Q.misses; const r = __ps.tapAt(innerWidth * .5, innerHeight * .97); return [m0, Q.misses, r]; })()')
+        check('clicking empty ground is NOT a miss: it is a shine (no penalty, no points)', r[1] == r[0] and r[2] == 'shine', r)
+        # v2 TAP TO SHINE: a click near a hiding ghost swings the lantern there and startles the ghost up; the next click catches it
+        r = await ev(pg, """(() => { const Q = __ps.hunt(); for (let i = 0; i < 300 && !Q.ghosts.some(g => g.alive && g.st === 'hide' && g.kind !== 'mimic'); i++) __ps.stepq(1/30);
+          const g = Q.ghosts.find(g => g.alive && g.st === 'hide' && g.kind !== 'mimic'); if (!g) return null; Q.setBeam(-g.x, g.z); __ps.stepq(1/30); const s = __ps.screen(g.x, 0, g.z - .25); return [g.id, s.x, s.y, Q.beam.x]; })()""")
+        if r: await pg.mouse.click(r[1], r[2])
+        r2 = await ev(pg, f'(() => {{ const Q = __ps.hunt(); const g = Q.ghosts.find(q => q.id === {r[0] if r else -1}); const b0 = Q.beam.x; __ps.stepq(1/30, 8); return [g && g.st, g && g.startled, b0, Q.beam.x, g && g.x, __ps.tut()]; }})()')
+        check('TAP TO SHINE: a click on empty ground near a hiding ghost swings the lantern there (smooth) and startles that ghost up', r and r2[0] == 'peek' and r2[1] and abs(r2[3] - r2[4]) < 1.2, (r, r2))
+        sw = await ev(pg, '(() => { const Q = __ps.hunt(); Q.setBeam(-4, 0); const s = __ps.screen(4, 0, -.25); __ps.shineAt(s.x, s.y); const a = Q.beam.x; __ps.stepq(1/60, 3); const b = Q.beam.x; __ps.stepq(1/60, 30); return [a, b, Q.beam.x]; })()')
+        check('tap-to-shine swings the lantern smoothly (not a jump), and arrives in ~0.3 s', sw[0] == -4 and -4 < sw[1] < 3.5 and abs(sw[2] - 4) < .3, sw)
+        t2 = await ev(pg, f'(__ps.ghostTargets().find(o => o.id === {r[0] if r else -1}) || null)'); c0 = await ev(pg, '__ps.hunt().caught')
+        if t2: await pg.mouse.click(t2['x'], t2['y'])
+        c1 = await ev(pg, '[__ps.hunt().caught, __ps.tut(), getComputedStyle(document.getElementById("hint")).visibility]')
+        check('TAP TO CATCH: the next click on the startled ghost catches it (catch window ≥ 1.3 s); the first-play hint moves past step 2', t2 and t2['ok'] and t2['r'] >= 30 and c1[0] == c0 + 1 and c1[1] >= 2, (t2, c0, c1))
         r = await ev(pg, '(() => { const Q = __ps.hunt(); const d = Q.decoys.findIndex(d => d.spot >= 0); if (d < 0) return null; const D = Q.decoys[d]; Q.setBeam(D.x, D.z - .5); __ps.step(1/30, 1); const s = __ps.decoyScreen(d); return [d, D.kind, s.x, s.y, Q.oil, Q.combo]; })()')
         if r:
             await pg.mouse.click(r[2], r[3]); r2 = await ev(pg, '[__ps.hunt().decoyHits, __ps.hunt().oil, __ps.hunt().combo, window.__pops.slice(-1)[0]]')
@@ -109,9 +124,13 @@ async def main():
         hit = await ev(pg, HITTEST + "(['btnBolt'])")
         rd = await ev(pg, '[document.getElementById("btnBolt").classList.contains("ready"), __ps.hunt().canStrike()]')
         check('storm full → the big ⚡ button glows, ≥ 76 px, hit-testable in the thumb corner', rd[0] and rd[1] and hit[0][3] and hit[0][1] >= 76, (rd, hit))
-        await pg.click('#btnBolt'); await ev(pg, '__ps.stepq(1/30, 6)')
+        await ev(pg, '__ps.stepq(1/30, 1)'); await pg.click('#btnBolt'); await ev(pg, '__ps.stepq(1/30, 6)')
+        q = await ev(pg, """(() => { const Q = __ps.hunt(); const g = Q.ghosts.find(g => g.alive); const p0 = window.__pops.length; if (g) Q.tap(g.id); __ps.handleEvents(); __ps.stepq(1/30, 3);
+          const a = [__ps.quiet(), window.__pops.length - p0, document.getElementById('pops').children.length, document.getElementById('banner').classList.contains('show'), document.getElementById('toast').classList.contains('show')];
+          __ps.stepq(1/30, 45); return [a, __ps.quiet(), window.__pops.length - p0]; })()""")
+        check('LIGHTNING: the first 1.5 s show no popups / banners / toasts (clean reveal), the held catch popup shows afterwards', q[0][0] and q[0][1] == 0 and q[0][2] == 0 and not q[0][3] and not q[0][4] and not q[1] and q[2] >= 1, q)
         r = await ev(pg, '(() => { const Q = __ps.hunt(); const al = Q.ghosts.filter(g => g.alive); return [Q.state, +__ps.W.xray.toFixed(2), +__ps.S.ts.toFixed(2), al.length, al.every(g => g.frozen), +__ps.W.crowdK.toFixed(2), window.__banners.slice(-1)[0]]; })()')
-        check('⚡ LIGHTNING: the bolt hits, time slows, every ghost freezes and glows through the stones, the watching crowd appears', r[0] == 'strike' and r[1] > .6 and r[2] < .6 and r[3] >= 1 and r[4] and r[5] > .3 and 'LIGHTNING' in r[6], r)
+        check('⚡ LIGHTNING: the bolt hits, time slows, every ghost freezes and glows through the stones, the watching crowd appears (no text over it)', r[0] == 'strike' and r[1] > .6 and r[2] < .6 and r[3] >= 1 and r[4] and r[5] > .3 and 'LIGHTNING' not in str(r[6]), r)  # v2: no strike banner, a clean reveal
         await shot(pg, 'p3-strike.png', 6)
         t = await ev(pg, '(() => { const t = __ps.ghostTargets().find(o => o.ok && o.x > 20 && o.x < innerWidth - 120 && o.y > 120 && o.y < innerHeight - 40); return t || null; })()')
         k0 = await ev(pg, '[__ps.hunt().frozenCaught, __ps.hunt().score]')
@@ -144,6 +163,9 @@ async def main():
         check('the three nights differ: pumpkin mimics on Night I, shades from Night II, rain on Night III', out[0][9]['mimic'] > 0 and out[0][9]['shade'] == 0 and out[1][9]['shade'] > 0 and out[2][9]['shade'] > 0, [x[9] for x in out])
         r = await ev(pg, '(() => { const o = []; for (const n of [0, 1, 2]) { document.querySelector(`#nights button[data-n="${n}"]`).click(); __ps.start("night"); __ps.stepq(1/30, 10); o.push([+__ps.W.rainK.toFixed(2), __ps.hunt().decoys.length, __ps.hunt().N.swapEvery]); } __ps.toMenu(); document.querySelector(`#nights button[data-n="0"]`).click(); return o; })()')
         check('Night I dry, II drizzle, III storm rain; more cat/owl decoys and ghosts that swap hiding places on III', r[0][0] == 0 and 0 < r[1][0] < r[2][0] and r[2][1] > r[0][1] and r[2][2] > 0, r)
+        sk = await ev(pg, """(() => { const Q = __ps.hunt(); const keep = [Q.score, Q.caught, Q.combo, Q.oil, Q.storm]; localStorage.removeItem('ps-tut'); __ps.start('night'); __ps.stepq(1/30, 12); __ps.step(1/30); const a = __ps.tut(); const b = document.getElementById('hintX').getBoundingClientRect();
+          document.getElementById('hintX').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); const r = [a, Math.round(b.width), __ps.tut(), localStorage.getItem('ps-tut')]; __ps.start('night'); __ps.stepq(1/30, 12); r.push(__ps.tut()); return r; })()""")
+        check('the hint can be skipped (✕ ≥ 44 px) and then never shows again', sk[0] == 0 and sk[1] >= 44 and sk[2] == -1 and sk[3] == '1' and sk[4] == -1, sk)
         r = await ev(pg, '(() => { __ps.start("night"); __ps.auto(false); const Q = __ps.hunt(); let i = 0; for (; i < 9000 && __ps.S.state === "play"; i++) __ps.stepq(1/30, 1); return [Q.res, __ps.S.state, (i / 30) | 0, Q.caught, document.getElementById("eTitle").textContent]; })()')
         check('doing nothing on Medium: the lantern burns out, the night is lost', r[0] == 'fail' and r[1] == 'end' and 70 <= r[2] <= 100, r)
         await shot(pg, 'e2-lost.png', 10)

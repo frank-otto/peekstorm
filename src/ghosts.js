@@ -22,7 +22,7 @@ export function createGhostKit(W, pumpkinGeo, stemGeo, M) {
   const scene = W.scene, G = ghostGeo(), K = { pool: [], decoys: [], scene, G };
   const eyeG = new THREE.SphereGeometry(1, 14, 10), armG = new THREE.SphereGeometry(1, 10, 8);
   for (let i = 0; i < 8; i++) { const root = new THREE.Group(); root.visible = false; scene.add(root);
-    const body = new THREE.Group(); root.add(body); const sheetM = ghostMat('#e8f0ff', '#8fb8ff'), shadeM = ghostMat('#20142e', '#7a3aff');
+    const body = new THREE.Group(); root.add(body); const sheetM = ghostMat('#c4cede', '#8fb8ff'), shadeM = ghostMat('#20142e', '#7a3aff');
     const mesh = new THREE.Mesh(G, sheetM); mesh.castShadow = true; body.add(mesh);
     const eyeM = new THREE.MeshStandardMaterial({ color: '#05060a', roughness: .2, emissive: '#000000' }); const eyes = [-1, 1].map(s => { const e = new THREE.Mesh(eyeG, eyeM); e.position.set(s * .1, .72, .285); e.scale.set(.055, .08, .03); body.add(e); return e; });
     const mouth = new THREE.Mesh(eyeG, eyeM); mouth.position.set(0, .56, .315); mouth.scale.set(.05, .035, .02); body.add(mouth);
@@ -61,7 +61,7 @@ export function decoyY(d) { const k = SPOTS[d.spot] ? SPOTS[d.spot].k : 'stone';
 export function decoyPos(d, out) { const k = SPOTS[d.spot] ? SPOTS[d.spot].k : 'stone'; if (k === 'oak') return out.set(OAK.x + (d.spot % 2 ? -.7 : .8), 2.25 + (d.spot % 2 ? .3 : 0), OAK.z + .1);
   if (k === 'crypt' || k === 'door') return out.set(CRYPT.x + (d.spot % 2 ? .7 : -.6), CRYPT.h + .18, CRYPT.z + .5); return out.set(d.x, 1.0, d.z); }
 // per frame: map rule ghosts to pooled visuals
-const _to = new THREE.Vector3();
+const _to = new THREE.Vector3(); const GS = 1.3; // ghost size on screen (v1: .82)
 export function updateGhosts(K, Q, t, dt, cam, W, opts = {}) {
   const live = new Map(); if (Q) for (const g of Q.ghosts) if (g.alive || g.st === 'caught') live.set(g.id, g);
   for (const v of K.pool) { if (v.id >= 0 && !live.has(v.id) && v.caughtT < 0) { v.id = -1; v.root.visible = false; } }
@@ -71,23 +71,23 @@ export function updateGhosts(K, Q, t, dt, cam, W, opts = {}) {
     if (!g.alive && v.caughtT < 0) { v.caughtT = 0; v.from.copy(v.root.position); }
     if (v.caughtT >= 0) continue;
     const strike = Q.state === 'strike'; const frz = strike ? 1 : 0;
-    const peek = g.st === 'peek' ? smooth(Math.min(g.stT / .18, 1, (Q.D.peekLen - g.stT) / .2)) : 0; v.lean = lerp(v.lean, peek, Math.min(1, dt * 14)); if (g.st !== 'peek') v.side = g.side;
+    const pl = g.peekLen || Q.D.peekLen; const peek = g.st === 'peek' ? smooth(Math.min(g.stT / .18, 1, (pl - g.stT) / .2)) : 0; v.lean = lerp(v.lean, peek, Math.min(1, dt * 14)); if (g.st !== 'peek') v.side = g.side;
     let x = g.x, z = g.z, y = .04 + Math.sin(t * 2.2 + g.id) * .04;
     if (g.st === 'flee') { const k = Math.min(1, g.flT / g.flLen); y += Math.sin(k * Math.PI) * (mim ? .9 : .6); }
-    x += v.side * .42 * v.lean; y += .1 * v.lean;
+    const up = g.startled && g.st === 'peek' ? 1 : 0; x += v.side * .42 * v.lean * (1 - up * .6); y += .1 * v.lean + up * v.lean * (.55 + Math.sin(t * 6 + g.id) * .06); // startled: it pops straight up
     v.root.position.set(x, y, z); const face = Math.atan2(cam.position.x - x, cam.position.z - z); v.root.rotation.y = face; v.body.rotation.z = -v.side * .38 * v.lean + (strike ? Math.sin(t * 40 + g.id) * .03 : 0); v.body.rotation.x = g.st === 'flee' ? .25 : 0;
     const flee = g.st === 'flee' ? 1 : 0; const vis = mim ? 1 : clamp(Math.max(g.rev * 1.05, v.lean * .92, flee * .8, frz, opts.allVis || 0), 0, 1); v.vis = lerp(v.vis, vis, Math.min(1, dt * 12));
     const tell = Math.max(v.lean, g.rev, flee, frz);
-    if (!mim) { const m = v.mesh.material; m.opacity = v.vis * (g.kind === 'shade' ? .92 : .9); m.depthWrite = v.vis > .9; m.emissiveIntensity = (g.kind === 'shade' ? .25 : .3) + tell * .5 + frz * .4; m.userData.u.uTime.value = t + g.id; m.userData.u.uRim.value = .35 + tell * .9 + frz; m.userData.u.uFreeze.value = frz; v.mesh.castShadow = v.vis > .6;
+    if (!mim) { const m = v.mesh.material; m.opacity = v.vis * (g.kind === 'shade' ? .92 : .9); m.depthWrite = v.vis > .9; m.emissiveIntensity = (g.kind === 'shade' ? .25 : .22) + tell * .25 + frz * .4; m.userData.u.uTime.value = t + g.id; m.userData.u.uRim.value = .7 + tell * .9 + frz; m.userData.u.uFreeze.value = frz; v.mesh.castShadow = v.vis > .6;
       v.eyeM.opacity = 1; v.eyeM.transparent = true; v.eyes.forEach(e => { e.material.opacity = Math.max(v.vis, g.kind === 'shade' ? .9 : 0); e.scale.set(.055 * (1 + frz * .45), .08 * (1 + frz * .55), .03); }); v.eyeM.emissiveIntensity = g.kind === 'shade' ? 1.2 + tell * 2 : 0;
       v.mouth.scale.set(.05 * (1 + frz * .5 + v.lean * .3), .035 * (1 + frz * 1.6 + v.lean * .6), .02); v.root.visible = v.vis > .01 || g.kind === 'shade';
       v.arms.forEach((a, i) => { const s = i ? 1 : -1; const wave = v.lean * Math.sin(t * 14 + i * 2) * .1 + frz * .25; a.position.set(s * (.36 + v.lean * .04), .42 + wave + frz * .18, .05 + frz * .06); });
-      const sq = g.st === 'flee' ? 1.18 : 1 + frz * .05; v.body.scale.set(.82 / Math.sqrt(sq), .82 * sq, .82 / Math.sqrt(sq)); }
+      const sq = g.st === 'flee' ? 1.18 : 1 + frz * .05; v.body.scale.set(GS / Math.sqrt(sq), GS * sq, GS / Math.sqrt(sq)); }
     else { v.pumpM.emissiveIntensity = (Math.max(v.lean, g.rev * .8, flee) * (1.6 + Math.sin(t * 30) * .6) + frz * 1.5); v.pk.rotation.z = Math.sin(t * 28) * .06 * Math.max(v.lean, g.rev); v.pk.position.y = .25 + v.lean * .12 * Math.abs(Math.sin(t * 9)); v.root.visible = true; v.root.rotation.y = face; v.body.scale.setScalar(1); }
     const xk = W.xray * (g.alive ? 1 : 0); v.xm.uniforms.k.value = xk; v.xm.uniforms.time.value = t; v.xr.visible = !mim && xk > .01; v.pxm.uniforms.k.value = xk; v.pxr.visible = mim && xk > .01; }
   // catch animation: spin, shrink and fly into the lantern
   for (const v of K.pool) { if (v.caughtT < 0) continue; v.caughtT += dt; const k = Math.min(1, v.caughtT / .7), e = k * k; const to = _to.set(v.from.x * .8 + W.spot.position.x * .2, v.from.y + 2.9, v.from.z + .9); // spirals up toward the lantern and vanishes in a sparkle
-    v.root.position.set(lerp(v.from.x, to.x, e), lerp(v.from.y, to.y, e) + Math.sin(k * Math.PI) * .8, lerp(v.from.z, to.z, e)); v.root.rotation.y += dt * 18; const s = (1 - k * .9) * .82; v.body.scale.setScalar(s);
+    v.root.position.set(lerp(v.from.x, to.x, e), lerp(v.from.y, to.y, e) + Math.sin(k * Math.PI) * .8, lerp(v.from.z, to.z, e)); v.root.rotation.y += dt * 18; const s = (1 - k * .9) * GS; v.body.scale.setScalar(s);
     if (v.kind !== 'mimic') { v.mesh.material.opacity = .95 * (1 - k * .5); v.mesh.material.emissiveIntensity = 1.4; v.mesh.material.userData.u.uRim.value = 2; } else v.pumpM.emissiveIntensity = 3;
     v.xr.visible = false; v.pxr.visible = false; if (k >= 1) { v.caughtT = -1; v.id = -1; v.root.visible = false; } }
   // decoys
@@ -97,4 +97,4 @@ export function updateGhosts(K, Q, t, dt, cam, W, opts = {}) {
   // crowd
   const ck = W.crowdK; K.crowd.visible = ck > .01; K.crowd.material.uniforms.k.value = ck; K.crowd.material.uniforms.time.value = t; K.crowdEyes.visible = ck > .01; K.crowdEyes.material.opacity = ck;
 }
-export function ghostScreenPos(v, out) { return out.set(v.root.position.x, v.root.position.y + (v.kind === 'mimic' ? .25 : .5), v.root.position.z); }
+export function ghostScreenPos(v, out) { return out.set(v.root.position.x, v.root.position.y + (v.kind === 'mimic' ? .25 : .75), v.root.position.z); }

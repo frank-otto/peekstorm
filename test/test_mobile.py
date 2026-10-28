@@ -53,6 +53,8 @@ async def run(p, eng, dev, land, loc):
     if land: d['viewport'] = {'width': d['viewport']['height'], 'height': d['viewport']['width']}
     W, H = d['viewport']['width'], d['viewport']['height']; tag = f"{dev.replace(' ', '')}-{'land' if land else 'port'}"; T = f'[{tag} {eng} {W}×{H} {loc}]'
     kw = {} if eng == 'webkit' else dict(executable_path='/usr/bin/google-chrome', args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
+    if eng == 'webkit' and os.environ.get('PS_NO_WEBKIT'):  # box without WebKit libs: same iPhone descriptors (viewport, DPR, touch, UA) in Chromium
+        eng = 'chromium'; kw = dict(executable_path='/usr/bin/google-chrome', args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']); T = T.replace('webkit', 'chromium')
     b = await (p.webkit if eng == 'webkit' else p.chromium).launch(**kw)
     ctx = await b.new_context(**d, locale=loc); await ctx.add_init_script("window.__psNoAutoQ = true; try{if(!sessionStorage.getItem('psInit')){sessionStorage.setItem('psInit','1'); localStorage.clear();}}catch(e){}")
     pg = await ctx.new_page(); pg.set_default_timeout(30000); errs = []
@@ -97,6 +99,19 @@ async def run(p, eng, dev, land, loc):
     c1 = await ev(pg, '[__ps.hunt().caught, __ps.hunt().score]')
     check(f'{T} a real finger tap on a peeking / lit ghost catches it (+points)', t is not None and c1[0] == c0 + 1 and c1[1] > 0, (t, c0, c1))
     await ev(pg, '__ps.step(1/30, 6)'); await pg.screenshot(path=f'{OUT}{tag}-1b-catch.png')
+    # v2: one-thumb TAP TO SHINE → the hiding ghost pops up → TAP TO CATCH (real touch taps, no drag)
+    r = await ev(pg, """(() => { const Q = __ps.hunt(); const ui = ['hud', 'meters', 'top', 'btnBolt', 'hint'].map(id => document.getElementById(id).getBoundingClientRect());
+      Q.setBeam(0, -3); for (let i = 0; i < 600; i++) { if (Q.state === 'hunt') for (const q of Q.ghosts) if (q.alive && q.st !== 'flee') { q.st = 'hide'; q.peekT = 99; q.rev = 0; q.nerveT = 0; } // a calm yard: only the startled ghost will show
+        const g = Q.ghosts.find(g => { if (!g.alive || g.st !== 'hide' || g.kind === 'mimic') return false; const s = __ps.screen(g.x, 0, g.z - .25); return s.x > 70 && s.x < innerWidth - 70 && s.y > 60 && s.y < innerHeight - 40 && !ui.some(r => r.width && s.x > r.left - 10 && s.x < r.right + 10 && s.y > r.top - 10 && s.y < r.bottom + 10); });
+        if (g && Q.state === 'hunt') { const s = __ps.screen(g.x, 0, g.z - .25); return [g.id, s.x, s.y]; } __ps.stepq(1/30); } return null; })()""")
+    if r: await pg.touchscreen.tap(r[1], r[2])
+    await ev(pg, '__ps.stepq(1/30, 8); __ps.step(1/30)')
+    t2 = await ev(pg, f'[(__ps.ghostTargets().find(o => o.id === {r[0] if r else -1}) || null), __ps.hunt().ghosts.find(q => q.id === {r[0] if r else -1})?.startled]')
+    check(f'{T} TAP TO SHINE: one finger tap near a hiding ghost points the lantern there and the ghost pops up (startled)', r and t2[0] and t2[0]['st'] == 'peek' and t2[1], (r, t2))
+    c0 = await ev(pg, '__ps.hunt().caught')
+    if t2[0]: await pg.touchscreen.tap(t2[0]['x'], t2[0]['y'] + 18)  # a thumb lands a bit low: the generous touch radius still catches it
+    c1 = await ev(pg, '__ps.hunt().caught')
+    check(f'{T} TAP TO CATCH: the next tap on the popped-up ghost catches it (touch hit radius ≥ 44 px)', c1 == c0 + 1, (t2, c0, c1))
     await ev(pg, '__ps.fillStorm(); __ps.stepq(1/30, 1); __ps.setUI()'); await tap(pg, '#btnBolt'); s1 = await ev(pg, '__ps.hunt().state')
     await ev(pg, '__ps.step(1/30, 10)'); await pg.screenshot(path=f'{OUT}{tag}-1c-lightning.png')
     check(f'{T} a real tap on the glowing ⚡ calls the lightning reveal', s1 == 'strike', s1)

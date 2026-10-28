@@ -7,7 +7,7 @@ A cinematic 3D ghost hunt in a stormy churchyard at night. Ghosts hide behind cr
 **The hook – THE LIGHTNING REVEAL.** Every catch charges the storm. When it is full, tap ⚡: a bolt splits the sky and hits the old oak, time slows, the whole churchyard flashes white – and every hiding ghost glows through the stones, frozen mid-move. Catch them for **double points** before the dark returns. And in that flash you see it: the hill, the fence, the trees and the church are full of ghosts. **They were watching all along.**
 
 ## How to play
-- **Drag** (or move the mouse) to point the lantern; **tap / click** a ghost to catch it. Keys: arrows / WASD aim, **Space** catches in the light, **L** calls the lightning, **Esc** menu.
+- **Tap / click** anywhere to shine the lantern there – a ghost hiding nearby jumps up; **tap it** to catch it. Catches fill the storm: tap **⚡** and the lightning shows every ghost (×2). Dragging also works, it is never needed. Keys: arrows / WASD aim, **Space** catches in the light, **L** calls the lightning, **Esc** menu.
 - A ghost can be caught while it is lit, peeking out or in mid-air. Catches within 4 s build a combo (×2 at 3, ×3 at 6, up to ×4). Peek catches and mid-air catches give bonus points.
 - **Yellow eyes are a cat or an owl** – tapping them costs lantern oil and the combo.
 - The lantern burns down; every catch adds a little oil. If it goes out, the night is lost. Leftover oil is a bonus when the yard is clear. 1 to 3 stars per night.
